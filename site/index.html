@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SN API Docs: ServiceNow API reference (unofficial)</title>
+<link rel="canonical" href="https://snapidocs.com/">
+<meta name="description" content="Unofficial, searchable browser for the ServiceNow server, client and REST API reference.">
+<script>
+  // Apply the saved theme before first paint.
+  try { var t = localStorage.getItem('theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="top">
+  <button id="menu" class="icon-btn" aria-label="Browse APIs" title="Browse APIs">&#9776;</button>
+  <a class="brand" href="#/" aria-label="SN API Docs home"><span class="mark" aria-hidden="true">{&nbsp;}</span><span class="word"><strong><b>SN</b> API Docs</strong><small>ServiceNow reference &middot; unofficial</small></span></a>
+  <div class="search">
+    <input id="q" type="search" placeholder="Search APIs and methods, e.g. GlideRecord.addQuery   ( / )" autocomplete="off" spellcheck="false" aria-label="Search APIs and methods">
+    <div id="results" class="results" hidden></div>
+  </div>
+  <label class="release">Release
+    <select id="release" aria-label="Release"></select>
+  </label>
+  <button id="theme" class="icon-btn" aria-label="Toggle light or dark theme" title="Toggle theme">&#9680;</button>
+</header>
+<nav id="tabs" class="tabs" aria-label="API sets"></nav>
+<div class="layout">
+  <aside id="side" class="side">
+    <input id="filter" type="search" placeholder="Filter APIs and methods" autocomplete="off" spellcheck="false" aria-label="Filter APIs and methods">
+    <div id="list" class="list"></div>
+  </aside>
+  <main id="main" class="main" tabindex="-1"></main>
+</div>
+<footer class="foot">
+  SN API Docs (snapidocs.com) is unofficial and not affiliated with ServiceNow. Documentation content is &copy; ServiceNow, Inc. and is reproduced from the
+  <a href="https://www.servicenow.com/docs/r/api-reference/api-reference.html" target="_blank" rel="noopener noreferrer">official API reference</a>;
+  every page links to its source. <span id="generated"></span>
+</footer>
+<script type="module" src="app.js"></script>
+</body>
+</html>

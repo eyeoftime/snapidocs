@@ -1,0 +1,15 @@
+{
+  "name": "snapidocs",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Unofficial searchable browser for the ServiceNow API reference, with regenerable data",
+  "type": "module",
+  "scripts": {
+    "refresh": "node scripts/build-data.mjs",
+    "check": "node scripts/check.mjs",
+    "serve": "node scripts/serve.mjs"
+  },
+  "dependencies": {
+    "cheerio": "^1.0.0"
+  }
+}

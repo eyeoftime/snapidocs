@@ -1,0 +1,70 @@
+{
+ "generated": "2026-11-16T10:39:25.233Z",
+ "releases": [
+  {
+   "family": "brazil",
+   "title": "Brazil",
+   "latest": true,
+   "generated": "2026-11-16T10:33:04.277Z",
+   "counts": {
+    "server-scoped": 252,
+    "server-global": 304,
+    "client": 65,
+    "rest": 139,
+    "members": 5201
+   }
+  },
+  {
+   "family": "australia",
+   "title": "Australia",
+   "latest": false,
+   "generated": "2026-11-16T10:36:05.869Z",
+   "counts": {
+    "server-scoped": 251,
+    "server-global": 305,
+    "client": 57,
+    "rest": 136,
+    "members": 5077
+   }
+  },
+  {
+   "family": "zurich",
+   "title": "Zurich",
+   "latest": false,
+   "generated": "2026-11-16T10:37:03.140Z",
+   "counts": {
+    "server-scoped": 246,
+    "server-global": 301,
+    "client": 57,
+    "rest": 122,
+    "members": 4986
+   }
+  },
+  {
+   "family": "yokohama",
+   "title": "Yokohama",
+   "latest": false,
+   "generated": "2026-11-16T10:37:50.685Z",
+   "counts": {
+    "server-scoped": 240,
+    "server-global": 297,
+    "client": 52,
+    "rest": 112,
+    "members": 4732
+   }
+  },
+  {
+   "family": "xanadu",
+   "title": "Xanadu",
+   "latest": false,
+   "generated": "2026-11-16T10:38:40.354Z",
+   "counts": {
+    "server-scoped": 223,
+    "server-global": 287,
+    "client": 52,
+    "rest": 101,
+    "members": 4585
+   }
+  }
+ ]
+}
