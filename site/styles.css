@@ -145,3 +145,6 @@ caption { text-align: left; font-weight: 600; padding: 6px 0; color: var(--muted
   .mtable td.ret, .mtable th.ret { display: none; }
   .copy { opacity: 1; }
 }
+
+/* A parameter or return type that links to its own API page */
+.tlink { font-weight: 500; }

@@ -34,14 +34,17 @@ async function loadIndex(family) {
   if (!indexCache.has(family)) {
     const raw = await getJson(`data/${family}/index.json`);
     const byId = new Map();
+    const byName = new Map(); // class name -> APIs, for linking parameter and return types
     for (const a of raw.apis) {
       a.ln = a.n.toLowerCase();
       a.ls = (a.s || '').toLowerCase();
       a.ini = a.n.replace(/[^A-Z]/g, '').toLowerCase();
       a.m = a.m.map(([n, sig, s, anchor, kind]) => ({ n, sig, s, anchor, kind, ln: n.toLowerCase(), lsig: sig.toLowerCase() }));
       byId.set(a.id, a);
+      if (!a.g.includes('rest')) (byName.get(a.n) || byName.set(a.n, []).get(a.n)).push(a);
     }
     raw.byId = byId;
+    raw.byName = byName;
     indexCache.set(family, raw);
   }
   return indexCache.get(family);
@@ -56,6 +59,40 @@ function loadDetail(family, id) {
 const findApi = (index, group, key) => index.apis.find((a) => a.k === key && a.g.includes(group));
 const groupOf = (api) => (api.g.includes(state.group) ? state.group : api.g[0]);
 const badges = (api) => api.g.map((g) => `<span class="badge b-${g}">${SHORT[g]}</span>`).join('') + (api.d ? '<span class="badge b-dep">Deprecated</span>' : '');
+
+// ---------- type links ----------
+
+// Names that appear as a type but mean the data format, not the documented class.
+const TYPE_SKIP = new Set(['JSON']);
+
+/** The API a type name refers to, preferring the tab being viewed, then the other Server tab, then Client. */
+function typeTarget(name) {
+  if (TYPE_SKIP.has(name)) return null;
+  const list = state.index?.byName.get(name);
+  if (!list) return null;
+  const g = state.group;
+  const order = g === 'client' ? ['client'] : g === 'server-global' ? ['server-global', 'server-scoped', 'client'] : ['server-scoped', 'server-global', 'client'];
+  for (const group of order) {
+    const api = list.find((a) => a.g.includes(group));
+    if (api) return api.k === state.apiKey && group === g ? null : { api, group };
+  }
+  return null;
+}
+
+/** Escapes a type string and links every identifier in it that is a documented API. */
+function linkTypes(text) {
+  if (state.group === 'rest') return esc(text);
+  let out = '';
+  let last = 0;
+  for (const m of String(text ?? '').matchAll(/[A-Za-z_$][\w$]*/g)) {
+    const t = typeTarget(m[0]);
+    if (!t) continue;
+    out += esc(text.slice(last, m.index));
+    out += `<a class="tlink" href="${hashFor(state.family, t.group, t.api.k)}" title="${esc(t.api.n)} (${SHORT[t.group]})">${esc(m[0])}</a>`;
+    last = m.index + m[0].length;
+  }
+  return out + esc(String(text ?? '').slice(last));
+}
 
 // ---------- search ----------
 
@@ -150,7 +187,7 @@ function renderTabs() {
 const expanded = new Set();
 let expandedVersion = 0;
 
-function renderList() {
+function renderList({ reveal = false } = {}) {
   const f = el('filter').value.trim().toLowerCase();
   const sig = [state.family, state.group, f, state.apiKey, state.anchor, expandedVersion].join('|');
   if (sig === state.listSig) return;
@@ -181,8 +218,12 @@ function renderList() {
         .join('')}</div>`;
     }
   }
-  el('list').innerHTML = html || '<div class="none">No API or method matches that filter.</div>';
-  (el('list').querySelector('a.mem.on') || el('list').querySelector('a.on'))?.scrollIntoView({ block: 'nearest' });
+  const list = el('list');
+  const top = list.scrollTop;
+  list.innerHTML = html || '<div class="none">No API or method matches that filter.</div>';
+  // Only navigation brings the current item into view; expanding a node or filtering leaves the scroll alone.
+  if (reveal) (list.querySelector('a.mem.on') || list.querySelector('a.on'))?.scrollIntoView({ block: 'nearest' });
+  else list.scrollTop = top;
 }
 
 function toggleNode(btn) {
@@ -231,6 +272,15 @@ function enhance(root) {
       setTimeout(() => (btn.textContent = 'Copy'), 1500);
     });
     wrap.append(pre, btn);
+  }
+  // Parameter types (second column) and return types (first column) link to their API where we have one.
+  for (const [sel, col] of [['table.parameters', 1], ['table.returns', 0]]) {
+    for (const row of root.querySelectorAll(`.doc ${sel} > tbody > tr`)) {
+      const cell = row.children[col];
+      if (!cell || cell.tagName !== 'TD' || cell.children.length) continue; // leave cells that already have markup
+      const html = linkTypes(cell.textContent);
+      if (html.includes('<a ')) cell.innerHTML = html;
+    }
   }
   for (const table of root.querySelectorAll('.doc table')) {
     const wrap = document.createElement('div');
@@ -284,7 +334,7 @@ function renderApi(api, d) {
     <div class="doc">${d.overview}</div>
     ${d.members.length ? `<h2>${noun} <small>(${d.members.length})</small></h2>
     <div class="table-wrap"><table class="mtable"><thead><tr><th>${group === 'rest' ? 'Endpoint' : 'Signature'}</th>${group === 'rest' ? '' : '<th class="ret">Returns</th>'}<th>Summary</th></tr></thead><tbody>${d.members
-      .map((m) => `<tr><td><a href="${hashFor(family, group, api.k, m.anchor)}">${esc(m.sig)}</a></td>${group === 'rest' ? '' : `<td class="ret">${esc(m.ret)}</td>`}<td>${esc(m.summary)}</td></tr>`)
+      .map((m) => `<tr><td><a href="${hashFor(family, group, api.k, m.anchor)}">${esc(m.sig)}</a></td>${group === 'rest' ? '' : `<td class="ret">${linkTypes(m.ret)}</td>`}<td>${esc(m.summary)}</td></tr>`)
       .join('')}</tbody></table></div>` : ''}
     ${d.members
       .map(
@@ -348,7 +398,7 @@ async function route() {
   el('release').value = family;
   el('generated').textContent = `Data for this release generated ${index.generated.slice(0, 10)}.`;
   renderTabs();
-  renderList();
+  renderList({ reveal: true });
   document.body.classList.remove('menu-open');
 
   if (!key) {
@@ -407,7 +457,7 @@ function wire() {
       q.select();
     }
   });
-  el('filter').addEventListener('input', renderList);
+  el('filter').addEventListener('input', () => renderList());
   el('list').addEventListener('click', (e) => { const b = e.target.closest('button.tw'); if (b) toggleNode(b); });
   el('release').addEventListener('change', (e) => switchRelease(e.target.value));
   el('menu').addEventListener('click', () => document.body.classList.toggle('menu-open'));
