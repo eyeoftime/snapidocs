@@ -60,6 +60,92 @@ const findApi = (index, group, key) => index.apis.find((a) => a.k === key && a.g
 const groupOf = (api) => (api.g.includes(state.group) ? state.group : api.g[0]);
 const badges = (api) => api.g.map((g) => `<span class="badge b-${g}">${SHORT[g]}</span>`).join('') + (api.d ? '<span class="badge b-dep">Deprecated</span>' : '');
 
+// ---------- favourites ----------
+// Kept in this browser's localStorage as [{ g: group, k: key, n: name, id: api id, r: release it was added in }].
+
+const favs = { list: [], version: 0, removed: [], checked: null };
+const MAX_FAVS = 200;
+
+/** Reads the saved list, discarding anything that is not a well-formed favourite. */
+function readFavs() {
+  let raw;
+  try { raw = JSON.parse(store.get('favs') || '[]'); } catch { raw = []; }
+  const seen = new Set();
+  favs.list = (Array.isArray(raw) ? raw : [])
+    .filter((f) => f && typeof f.k === 'string' && f.k && typeof f.n === 'string' && GROUP_IDS.includes(f.g))
+    .map((f) => ({ g: f.g, k: f.k, n: f.n, id: typeof f.id === 'string' ? f.id : '', r: typeof f.r === 'string' ? f.r : '' }))
+    .filter((f) => !seen.has(`${f.g}/${f.k}`) && seen.add(`${f.g}/${f.k}`))
+    .slice(0, MAX_FAVS);
+  favs.version++;
+}
+
+function saveFavs() {
+  store.set('favs', JSON.stringify(favs.list));
+  favs.version++;
+}
+
+const isFav = (g, k) => favs.list.some((f) => f.g === g && f.k === k);
+
+function toggleFav(g, k) {
+  const i = favs.list.findIndex((f) => f.g === g && f.k === k);
+  if (i >= 0) favs.list.splice(i, 1);
+  else {
+    const api = findApi(state.index, g, k);
+    if (!api || favs.list.length >= MAX_FAVS) return;
+    favs.list.push({ g, k: api.k, n: api.n, id: api.id, r: state.family });
+    favs.list.sort((a, b) => a.n.localeCompare(b.n) || GROUP_IDS.indexOf(a.g) - GROUP_IDS.indexOf(b.g));
+  }
+  saveFavs();
+  refreshFavUi();
+}
+
+/** Redraws everything that shows favourites: sidebar section, the star on the open API, the overview list. */
+function refreshFavUi() {
+  renderList();
+  const star = el('main').querySelector('button.star');
+  if (star) star.outerHTML = starButton(state.group, state.apiKey);
+  else if (!state.apiKey && state.index) renderOverview();
+}
+
+function starButton(g, k) {
+  const on = isFav(g, k);
+  const api = findApi(state.index, g, k);
+  return `<button class="star" type="button" aria-pressed="${on}" title="${on ? 'Remove from favourites' : 'Add to favourites'}" aria-label="${on ? 'Remove' : 'Add'} ${esc(api?.n || k)} ${on ? 'from' : 'to'} favourites">${on ? '&#9733;' : '&#9734;'}</button>`;
+}
+
+/**
+ * Checks saved favourites against the data. One that was renamed upstream (same id, new key) is repaired.
+ * One that is missing from the release being viewed is kept as long as it still exists in the latest release
+ * or in the release it was added in; otherwise it is removed and reported. Returns true if anything changed.
+ */
+async function validateFavs(index, family) {
+  const locate = (ix, f) => {
+    if (findApi(ix, f.g, f.k)) return f;
+    const a = f.id && ix.byId.get(f.id);
+    return a && a.g.includes(f.g) ? { ...f, k: a.k, n: a.n } : null;
+  };
+  const latest = (state.releases.find((r) => r.latest) || state.releases[0]).family;
+  const out = [];
+  const removed = [];
+  let changed = false;
+  for (const f of favs.list) {
+    let hit = locate(index, f);
+    for (const fam of [latest, f.r]) {
+      if (hit || !fam || fam === family || !state.releases.some((r) => r.family === fam)) continue;
+      try { hit = locate(await loadIndex(fam), f); } catch { hit = f; } // could not check: keep it
+    }
+    if (!hit) { removed.push(f.n); changed = true; continue; }
+    if (hit !== f) changed = true;
+    if (out.some((o) => o.g === hit.g && o.k === hit.k)) { changed = true; continue; }
+    out.push(hit);
+  }
+  if (!changed) return false;
+  favs.list = out;
+  favs.removed.push(...removed);
+  saveFavs();
+  return true;
+}
+
 // ---------- type links ----------
 
 // Names that appear as a type but mean the data format, not the documented class.
@@ -189,11 +275,28 @@ let expandedVersion = 0;
 
 function renderList({ reveal = false } = {}) {
   const f = el('filter').value.trim().toLowerCase();
-  const sig = [state.family, state.group, f, state.apiKey, state.anchor, expandedVersion].join('|');
+  const sig = [state.family, state.group, f, state.apiKey, state.anchor, expandedVersion, favs.version].join('|');
   if (sig === state.listSig) return;
   state.listSig = sig;
   let html = '';
   let sub = null;
+  if (!f && (favs.list.length || favs.removed.length)) {
+    const rel = state.releases.find((r) => r.family === state.family)?.title || state.family;
+    html += '<h4>Favourites</h4>';
+    if (favs.removed.length) {
+      const n = favs.removed.length;
+      html += `<div class="favnote"><span>Removed ${n} favourite${n > 1 ? 's' : ''} that no longer exist${n > 1 ? '' : 's'}: ${esc(favs.removed.join(', '))}</span><button type="button" class="favdismiss" aria-label="Dismiss">&times;</button></div>`;
+    }
+    for (const fv of favs.list) {
+      const here = findApi(state.index, fv.g, fv.k);
+      const tag = `<small class="tag">${SHORT[fv.g]}</small>`;
+      const label = here
+        ? `<a href="${hashFor(state.family, fv.g, fv.k)}">${esc(fv.n)}${tag}</a>`
+        : `<span class="gone" title="Not in the ${esc(rel)} release">${esc(fv.n)}${tag}<small> not in ${esc(rel)}</small></span>`;
+      html += `<div class="row fav"><span class="tw staricon">&#9733;</span>${label}<button type="button" class="unfav" data-g="${fv.g}" data-k="${esc(fv.k)}" aria-label="Remove ${esc(fv.n)} from favourites" title="Remove from favourites">&times;</button></div>`;
+    }
+    if (state.group !== 'client') html += '<h4>All APIs</h4>';
+  }
   for (const a of state.index.apis) {
     if (!a.g.includes(state.group)) continue;
     const nameHit = !f || a.ln.includes(f);
@@ -297,6 +400,7 @@ function renderOverview() {
   const apis = index.apis.filter((a) => a.g.includes(group));
   const recent = [...apis].filter((a) => a.u).sort((a, b) => b.u.localeCompare(a.u) || a.ln.localeCompare(b.ln)).slice(0, 10);
   const c = index.counts;
+  const myFavs = favs.list.filter((fv) => findApi(index, fv.g, fv.k));
   el('main').innerHTML = `
     <h1>${esc(label)} APIs <span class="badge b-${group}">${esc(rel?.title || family)}</span></h1>
     <p class="lead">A searchable, unofficial view of the ServiceNow API reference. Pick an API from the list or search across every API and method in this release.</p>
@@ -304,6 +408,9 @@ function renderOverview() {
       <div class="card"><b>${(c.members ?? 0).toLocaleString()}</b>methods and endpoints</div></div>
     <p class="tips">Search tips: press <kbd>/</kbd> to search &middot; <kbd>GlideRecord.addQuery</kbd> or <kbd>gr addq</kbd> finds a method on a class &middot;
       <kbd>&uarr;</kbd> <kbd>&darr;</kbd> <kbd>Enter</kbd> to pick a result &middot; the release switcher keeps you on the same API.</p>
+    ${myFavs.length ? `<h2>Your favourites</h2><p class="favlinks">${myFavs
+      .map((fv) => `<a href="${hashFor(family, fv.g, fv.k)}">&#9733; ${esc(fv.n)}<small class="tag">${SHORT[fv.g]}</small></a>`)
+      .join('')}</p>` : ''}
     ${recent.length ? `<h2>Recently updated</h2><div class="table-wrap"><table><tbody>${recent
       .map((a) => `<tr><td><a href="${hashFor(family, group, a.k)}">${esc(a.n)}</a></td><td>${esc(a.u)}</td><td>${esc(a.s)}</td></tr>`)
       .join('')}</tbody></table></div>` : ''}
@@ -323,7 +430,7 @@ function renderApi(api, d) {
   const noun = group === 'rest' ? 'Endpoints' : 'Methods';
   const kindLabel = { constructor: 'Constructor', property: 'Property' };
   el('main').innerHTML = `
-    <h1>${esc(d.name)}${badges(api)}</h1>
+    <h1>${esc(d.name)}${badges(api)}${starButton(group, api.k)}</h1>
     ${d.summary ? `<p class="lead">${esc(d.summary)}</p>` : ''}
     <div class="meta">
       <span>Release: ${esc(rel?.title || family)}</span>
@@ -395,6 +502,10 @@ async function route() {
     expandedVersion++;
   }
   store.set('family', family);
+  if (favs.checked !== family) {
+    favs.checked = family; // check saved favourites against each release once, without holding up the page
+    validateFavs(index, family).then((changed) => changed && refreshFavUi());
+  }
   el('release').value = family;
   el('generated').textContent = `Data for this release generated ${index.generated.slice(0, 10)}.`;
   renderTabs();
@@ -458,7 +569,15 @@ function wire() {
     }
   });
   el('filter').addEventListener('input', () => renderList());
-  el('list').addEventListener('click', (e) => { const b = e.target.closest('button.tw'); if (b) toggleNode(b); });
+  el('list').addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.classList.contains('tw')) toggleNode(b);
+    else if (b.classList.contains('unfav')) toggleFav(b.dataset.g, b.dataset.k);
+    else if (b.classList.contains('favdismiss')) { favs.removed = []; favs.version++; renderList(); }
+  });
+  el('main').addEventListener('click', (e) => { if (e.target.closest('button.star') && state.apiKey) toggleFav(state.group, state.apiKey); });
+  window.addEventListener('storage', (e) => { if (e.key === 'favs') { readFavs(); refreshFavUi(); } });
   el('release').addEventListener('change', (e) => switchRelease(e.target.value));
   el('menu').addEventListener('click', () => document.body.classList.toggle('menu-open'));
   el('theme').addEventListener('click', () => {
@@ -479,6 +598,7 @@ async function start() {
     el('main').innerHTML = `<h1>No data yet</h1><p class="lead">Run <code>npm run refresh</code> to generate the documentation data, then reload. (${esc(e.message)})</p>`;
     return;
   }
+  readFavs();
   wire();
   renderReleases();
   await route();

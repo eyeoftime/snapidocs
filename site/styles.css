@@ -148,3 +148,24 @@ caption { text-align: left; font-weight: 600; padding: 6px 0; color: var(--muted
 
 /* A parameter or return type that links to its own API page */
 .tlink { font-weight: 500; }
+
+/* Favourites */
+:root { --star: #c98a00; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --star: #f0c04a; } }
+:root[data-theme="dark"] { --star: #f0c04a; }
+button.star { border: 0; background: none; padding: 0 4px; margin-left: 8px; font-size: 24px; line-height: 1; color: var(--muted); cursor: pointer; vertical-align: middle; border-radius: 4px; }
+button.star:hover, button.star[aria-pressed="true"] { color: var(--star); }
+button.star:focus-visible, .list .unfav:focus-visible { outline: 2px solid var(--accent); }
+.list .staricon { color: var(--star); display: grid; place-items: center; font-size: 11px; }
+.list .tag, .favlinks .tag { margin-left: 6px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.list .gone { flex: 1; min-width: 0; padding: 4px 10px 4px 4px; font-size: 14px; color: var(--muted); opacity: .7; }
+.list .unfav { flex: none; width: 22px; height: 29px; padding: 0; border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 15px; border-radius: 4px; opacity: 0; }
+.list .row.fav:hover .unfav, .list .unfav:focus-visible { opacity: 1; }
+.list .unfav:hover { background: var(--bg3); color: var(--fg); }
+@media (hover: none) { .list .unfav { opacity: 1; } }
+.list .favnote { display: flex; gap: 6px; align-items: flex-start; margin: 4px 4px 6px; padding: 6px 8px; font-size: 12.5px; background: var(--accent-bg); border-radius: 6px; }
+.list .favnote span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.list .favnote button { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px; }
+.favlinks { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.favlinks a { padding: 5px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg2); }
+.favlinks a:hover { text-decoration: none; border-color: var(--accent); }
