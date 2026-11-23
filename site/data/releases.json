@@ -1,42 +1,42 @@
 {
- "generated": "2026-11-16T17:10:52.645Z",
+ "generated": "2026-11-23T15:51:46.374Z",
  "releases": [
   {
    "family": "brazil",
    "title": "Brazil",
    "latest": true,
-   "generated": "2026-11-16T10:33:04.277Z",
+   "generated": "2026-11-23T15:50:33.143Z",
    "counts": {
     "server-scoped": 252,
     "server-global": 304,
     "client": 65,
-    "rest": 139,
-    "members": 5201
+    "rest": 142,
+    "members": 5214
    }
   },
   {
    "family": "australia",
    "title": "Australia",
    "latest": false,
-   "generated": "2026-11-16T10:36:05.869Z",
+   "generated": "2026-11-23T15:51:11.194Z",
    "counts": {
     "server-scoped": 251,
     "server-global": 305,
     "client": 57,
-    "rest": 136,
-    "members": 5077
+    "rest": 138,
+    "members": 5079
    }
   },
   {
    "family": "zurich",
    "title": "Zurich",
    "latest": false,
-   "generated": "2026-11-16T10:37:03.140Z",
+   "generated": "2026-11-23T15:51:46.180Z",
    "counts": {
     "server-scoped": 246,
     "server-global": 301,
     "client": 57,
-    "rest": 122,
+    "rest": 124,
     "members": 4986
    }
   },
