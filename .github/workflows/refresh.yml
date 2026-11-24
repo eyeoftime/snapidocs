@@ -24,9 +24,13 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deploy.outputs.page_url }}
+      url: ${{ steps.deploy.outputs.page_url || steps.deploy-retry.outputs.page_url }}
     steps:
+      # Always start from the current tip of main. A re-run would otherwise check out the commit the run first
+      # started on, and its data commit could never be pushed once main had moved on.
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -48,10 +52,20 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add site/data
-          git diff --cached --quiet || git commit -m "Refresh API reference data"
-          git push
+          if git diff --cached --quiet; then echo "No data changes"; exit 0; fi
+          git commit -m "Refresh API reference data"
+          git pull --rebase origin main
+          git push origin HEAD:main
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
+      # GitHub's Pages deployment API fails now and then ("no artifact found", HTTP 500); try once more.
       - id: deploy
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+      - name: Wait before retrying deploy
+        if: steps.deploy.outcome == 'failure'
+        run: sleep 60
+      - id: deploy-retry
+        if: steps.deploy.outcome == 'failure'
         uses: actions/deploy-pages@v4
